@@ -158,8 +158,8 @@
     </dependency>
     <dependency>
       <groupId>org.mortbay.jetty</groupId>
-      <artifactId>maven-jetty-plugin</artifactId>
-      <version>6.1.1</version>
+      <artifactId>jetty-maven-plugin</artifactId>
+      <version>8.1.13.v20130916</version> <!-- matches the version of Jetty now delegated to from Winstone; org.eclipse.jetty has only 9.x -->
     </dependency>
     <dependency>
       <groupId>net.java.sezpoz</groupId>

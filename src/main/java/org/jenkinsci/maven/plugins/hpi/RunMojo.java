@@ -30,14 +30,6 @@ import org.apache.maven.project.MavenProjectBuilder;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.taskdefs.Copy;
 import org.apache.commons.io.FileUtils;
-import org.mortbay.jetty.nio.SelectChannelConnector;
-import org.mortbay.jetty.plugin.Jetty6PluginServer;
-import org.mortbay.jetty.plugin.util.JettyPluginServer;
-import org.mortbay.jetty.plugin.util.Scanner;
-import org.mortbay.jetty.plugin.util.Scanner.Listener;
-import org.mortbay.jetty.plugin.util.SystemProperty;
-import org.mortbay.jetty.webapp.WebAppClassLoader;
-import org.mortbay.jetty.webapp.WebAppContext;
 
 import java.io.File;
 import java.io.IOException;
@@ -56,6 +48,12 @@ import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import org.eclipse.jetty.server.nio.SelectChannelConnector;
+import org.eclipse.jetty.util.Scanner;
+import org.eclipse.jetty.util.Scanner.Listener;
+import org.eclipse.jetty.webapp.WebAppClassLoader;
+import org.eclipse.jetty.webapp.WebAppContext;
+import org.mortbay.jetty.plugin.SystemProperty;
 
 /**
  * Runs Jenkins with the current plugin project.

@@ -18,14 +18,12 @@ import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.project.MavenProject;
-import org.mortbay.jetty.plugin.util.JettyPluginServer;
-import org.mortbay.jetty.plugin.util.JettyPluginWebApplication;
-import org.mortbay.jetty.plugin.util.PluginLog;
-import org.mortbay.jetty.plugin.util.Scanner;
-import org.mortbay.jetty.plugin.util.SystemProperty;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Scanner;
+import org.mortbay.jetty.plugin.PluginLog;
+import org.mortbay.jetty.plugin.SystemProperty;
 
 /**
  * DO NOT MODIFY.

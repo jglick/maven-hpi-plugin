@@ -1,11 +1,10 @@
 package org.jenkinsci.maven.plugins.hpi;
 
-import org.mortbay.jetty.plugin.util.Scanner;
-import org.mortbay.jetty.plugin.util.Scanner.Listener;
-
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import org.eclipse.jetty.util.Scanner;
+import org.eclipse.jetty.util.Scanner.Listener;
 
 public class ConsoleScanner extends Thread {
 

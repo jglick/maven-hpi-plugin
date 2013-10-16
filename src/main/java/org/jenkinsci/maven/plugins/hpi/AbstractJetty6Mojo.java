@@ -1,13 +1,10 @@
 package org.jenkinsci.maven.plugins.hpi;
 
-import org.mortbay.jetty.Connector;
-import org.mortbay.jetty.RequestLog;
-import org.mortbay.jetty.plugin.Jetty6PluginServer;
-import org.mortbay.jetty.plugin.util.JettyPluginServer;
-import org.mortbay.jetty.security.UserRealm;
-import org.mortbay.xml.XmlConfiguration;
 
 import java.io.File;
+import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.RequestLog;
+import org.eclipse.jetty.xml.XmlConfiguration;
 
 /**
  * DO NOT MODIFY.
