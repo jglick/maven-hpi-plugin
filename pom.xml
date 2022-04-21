@@ -5,7 +5,7 @@
   <parent>
     <groupId>org.jenkins-ci</groupId>
     <artifactId>jenkins</artifactId>
-    <version>1.71</version>
+    <version>1.73</version>
     <relativePath />
   </parent>
 
@@ -25,7 +25,7 @@
   </licenses>
 
   <scm>
-    <connection>scm:git:git://github.com/${gitHubRepo}.git</connection>
+    <connection>scm:git:https://github.com/${gitHubRepo}.git</connection>
     <developerConnection>scm:git:git@github.com:${gitHubRepo}.git</developerConnection>
     <tag>${scmTag}</tag>
     <url>https://github.com/${gitHubRepo}</url>
@@ -39,12 +39,12 @@
                </server>
       -->
       <id>github.com</id>
-      <url>gitsite:git@github.com/jenkinsci/maven-hpi-plugin.git</url>
+      <url>gitsite:git@github.com/${gitHubRepo}.git</url>
     </site>
   </distributionManagement>
 
   <properties>
-    <revision>3.26</revision>
+    <revision>3.28</revision>
     <changelist>-SNAPSHOT</changelist>
     <!-- used for escape -->
     <begin>${${$}}{</begin>
@@ -52,15 +52,13 @@
     <dollar>$</dollar>
     <openbracket>{</openbracket>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <java.level>8</java.level>
     <gitHubRepo>jenkinsci/${project.artifactId}</gitHubRepo>
-    <maven.version>3.8.4</maven.version>
+    <aether.version>1.1.0</aether.version>
+    <maven.version>3.8.5</maven.version>
     <maven-plugin-tools.version>3.6.4</maven-plugin-tools.version>
     <plexus-containers.version>2.1.1</plexus-containers.version>
     <aether.version>1.1.0</aether.version>
-
-    <!-- TODO lots of violations -->
-    <spotbugs.threshold>High</spotbugs.threshold>
+    <spotbugs.excludeFilterFile>${project.basedir}/src/spotbugs/spotbugs-excludes.xml</spotbugs.excludeFilterFile>
   </properties>
 
   <dependencyManagement>
@@ -71,29 +69,19 @@
         <version>1.3.2</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.maven</groupId>
-        <artifactId>maven-core</artifactId>
-        <version>${maven.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.maven</groupId>
-        <artifactId>maven-model</artifactId>
-        <version>${maven.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.maven</groupId>
-        <artifactId>maven-repository-metadata</artifactId>
-        <version>${maven.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.maven</groupId>
-        <artifactId>maven-settings</artifactId>
-        <version>${maven.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.apache.maven.shared</groupId>
         <artifactId>maven-shared-utils</artifactId>
         <version>3.3.4</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.aether</groupId>
+        <artifactId>aether-api</artifactId>
+        <version>${aether.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.aether</groupId>
+        <artifactId>aether-util</artifactId>
+        <version>${aether.version}</version>
       </dependency>
       <dependency>
         <groupId>org.eclipse.aether</groupId>
@@ -131,10 +119,9 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.ibm.icu</groupId>
-      <artifactId>icu4j</artifactId>
-      <version>70.1</version>
-      <!-- stapler plugin pulls jaxen pulls ancient ver that blows up annotation processing -->
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>31.1-jre</version>
     </dependency>
     <dependency>
       <groupId>com.sun.codemodel</groupId>
@@ -152,32 +139,20 @@
       <version>1.13</version>
     </dependency>
     <dependency>
+      <groupId>org.apache.ant</groupId>
+      <artifactId>ant</artifactId>
+      <version>1.10.12</version>
+    </dependency>
+    <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-archiver</artifactId>
       <version>3.5.2</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.maven</groupId>
-      <artifactId>maven-artifact</artifactId>
-      <version>${maven.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.maven</groupId>
-      <artifactId>maven-plugin-api</artifactId>
-      <version>${maven.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.maven.plugin-tools</groupId>
-      <artifactId>maven-plugin-annotations</artifactId>
-      <version>${maven-plugin-tools.version}</version>
-      <!-- annotations are not needed for plugin execution, so exclude using provided scope -->
-      <scope>provided</scope>
     </dependency>
     <!-- for copy-dependency-plugins -->
     <dependency>
       <groupId>org.apache.maven.plugins</groupId>
       <artifactId>maven-dependency-plugin</artifactId>
-      <version>3.2.0</version>
+      <version>3.3.0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
@@ -203,39 +178,89 @@
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-maven-plugin</artifactId>
-      <version>9.4.45.v20220203</version>
+      <version>9.4.46.v20220331</version>
     </dependency>
     <dependency>
       <groupId>org.jenkins-ci</groupId>
       <artifactId>version-number</artifactId>
-      <version>1.9</version>
-    </dependency>
-    <!-- for using annotation processor -->
-    <dependency>
-      <groupId>org.kohsuke.stapler</groupId>
-      <artifactId>maven-stapler-plugin</artifactId>
-      <version>1.17</version>
-      <!-- make sure to exclude servlet so that the one in Jetty (which has different groupId) will win -->
-      <exclusions>
-        <exclusion>
-          <groupId>javax.servlet</groupId>
-          <artifactId>servlet-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.kohsuke.stapler</groupId>
-          <artifactId>stapler</artifactId>
-        </exclusion>
-      </exclusions>
+      <version>1.10</version>
     </dependency>
     <dependency>
       <groupId>org.kohsuke.stapler</groupId>
       <artifactId>stapler-groovy</artifactId>
-      <version>1642.ve454c4518974</version>
+      <version>1669.v95a_4b_919a_b_a_2</version>
     </dependency>
     <dependency>
       <groupId>org.twdata.maven</groupId>
       <artifactId>mojo-executor</artifactId>
-      <version>2.3.3</version>
+      <version>2.4.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-artifact</artifactId>
+      <version>${maven.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-builder-support</artifactId>
+      <version>${maven.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-core</artifactId>
+      <version>${maven.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-model</artifactId>
+      <version>${maven.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-model-builder</artifactId>
+      <version>${maven.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-plugin-api</artifactId>
+      <version>${maven.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-repository-metadata</artifactId>
+      <version>${maven.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-resolver-provider</artifactId>
+      <version>${maven.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-settings</artifactId>
+      <version>${maven.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-settings-builder</artifactId>
+      <version>${maven.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven.plugin-tools</groupId>
+      <artifactId>maven-plugin-annotations</artifactId>
+      <version>${maven-plugin-tools.version}</version>
+      <!-- annotations are not needed for plugin execution, so exclude using provided scope -->
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
@@ -269,36 +294,7 @@
               <artifactId>wagon-gitsite</artifactId>
               <version>0.5</version>
             </dependency>
-            <dependency>
-              <groupId>org.apache.velocity</groupId>
-              <artifactId>velocity</artifactId>
-              <version>1.7</version>
-            </dependency>
           </dependencies>
-        </plugin>
-        <!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
-        <plugin>
-          <groupId>org.eclipse.m2e</groupId>
-          <artifactId>lifecycle-mapping</artifactId>
-          <configuration>
-            <lifecycleMappingMetadata>
-              <pluginExecutions>
-                <pluginExecution>
-                  <pluginExecutionFilter>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-antrun-plugin</artifactId>
-                    <versionRange>[1.3,)</versionRange>
-                    <goals>
-                      <goal>run</goal>
-                    </goals>
-                  </pluginExecutionFilter>
-                  <action>
-                    <ignore />
-                  </action>
-                </pluginExecution>
-              </pluginExecutions>
-            </lifecycleMappingMetadata>
-          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -312,23 +308,13 @@
               <rules>
                 <requireUpperBoundDeps>
                   <excludes combine.children="append">
-                    <exclude>com.google.guava:guava</exclude>
-                    <exclude>com.google.inject:guice</exclude>
-                    <exclude>commons-beanutils:commons-beanutils</exclude>
-                    <exclude>commons-codec:commons-codec</exclude>
                     <exclude>commons-io:commons-io</exclude>
                     <exclude>commons-lang:commons-lang</exclude>
                     <exclude>org.apache.commons:commons-compress</exclude>
-                    <exclude>org.apache.httpcomponents:httpclient</exclude>
-                    <exclude>org.apache.httpcomponents:httpcore</exclude>
-                    <exclude>org.apache.maven.doxia:doxia-decoration-model</exclude>
-                    <exclude>org.apache.maven:maven-project</exclude>
                     <exclude>org.apache.maven.wagon:wagon-provider-api</exclude>
                     <exclude>org.codehaus.plexus:plexus-container-default</exclude>
-                    <exclude>org.ow2.asm:asm</exclude>
+                    <exclude>org.eclipse.sisu:org.eclipse.sisu.plexus</exclude>
                     <exclude>org.slf4j:slf4j-api</exclude>
-                    <exclude>xerces:xercesImpl</exclude>
-                    <exclude>xml-apis:xml-apis</exclude>
                   </excludes>
                 </requireUpperBoundDeps>
               </rules>
