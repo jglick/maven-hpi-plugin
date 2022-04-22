@@ -20,7 +20,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.StringUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.DefaultArtifact;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
@@ -59,7 +58,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
      * List of dependency version overrides in the form {@code groupId:artifactId:version} to apply during testing.
      * Must correspond to dependencies already present in the project model.
      */
-    @Parameter(property="overrideVersions")
+    @Parameter(property = "overrideVersions")
     private List<String> overrideVersions;
 
     /**
@@ -68,7 +67,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
      * if the specified dependencies were to be written to the POM.
      * Intended for use in conjunction with {@link #overrideVersions}.
      */
-    @Parameter(property="useUpperBounds")
+    @Parameter(property = "useUpperBounds")
     private boolean useUpperBounds;
 
     @Override
@@ -83,7 +82,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
                 overrides.put(m.group(1), m.group(2));
             }
         }
-        File testDir = new File(project.getBuild().getTestOutputDirectory(),"test-dependencies");
+        File testDir = new File(project.getBuild().getTestOutputDirectory(), "test-dependencies");
         try {
             Files.createDirectories(testDir.toPath());
         } catch (IOException e) {
@@ -181,8 +180,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
                 String version = entry.getValue();
                 // Cannot use MavenProject.getArtifactMap since we may have multiple dependencies of different classifiers.
                 boolean found = false;
-                for (Object _a : project.getArtifacts()) {
-                    Artifact a = (Artifact) _a;
+                for (Artifact a : project.getArtifacts()) {
                     if (!a.getGroupId().equals(groupId) || !a.getArtifactId().equals(artifactId)) {
                         continue;
                     }
@@ -198,8 +196,8 @@ public class TestDependencyMojo extends AbstractHpiMojo {
             Properties properties = project.getProperties();
             getLog().info("Replacing POM-defined classpath elements " + classpathDependencyExcludes + " with " + additionalClasspathElements);
             // cf. http://maven.apache.org/surefire/maven-surefire-plugin/test-mojo.html
-            properties.setProperty("maven.test.additionalClasspath", StringUtils.join(additionalClasspathElements, ','));
-            properties.setProperty("maven.test.dependency.excludes", StringUtils.join(classpathDependencyExcludes, ','));
+            properties.setProperty("maven.test.additionalClasspath", String.join(",", additionalClasspathElements));
+            properties.setProperty("maven.test.dependency.excludes", String.join(",", classpathDependencyExcludes));
         }
     }
 
@@ -221,15 +219,14 @@ public class TestDependencyMojo extends AbstractHpiMojo {
             this.uniqueVersions = uniqueVersions;
         }
 
-        private Map<String, List<DependencyNodeHopCountPair>> keyToPairsMap
-                = new LinkedHashMap<String, List<DependencyNodeHopCountPair>>();
+        private Map<String, List<DependencyNodeHopCountPair>> keyToPairsMap = new LinkedHashMap<>();
 
         public boolean visit(DependencyNode node) {
             DependencyNodeHopCountPair pair = new DependencyNodeHopCountPair(node);
             String key = pair.constructKey();
             List<DependencyNodeHopCountPair> pairs = keyToPairsMap.get(key);
             if (pairs == null) {
-                pairs = new ArrayList<DependencyNodeHopCountPair>();
+                pairs = new ArrayList<>();
                 keyToPairsMap.put(key, pairs);
             }
             pairs.add(pair);
@@ -242,7 +239,6 @@ public class TestDependencyMojo extends AbstractHpiMojo {
         }
 
         // added for TestDependencyMojo in place of getConflicts/containsConflicts
-        @SuppressWarnings("unchecked")
         public Map<String, String> upperBounds() {
             Map<String, String> r = new HashMap<>();
             // TODO this does not suffice; does not find that workflow-api needs to go from 2.11 to 2.16, presumably because it was not a direct dependency to begin with
