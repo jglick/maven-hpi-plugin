@@ -1,5 +1,6 @@
 package org.jenkinsci.maven.plugins.hpi;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -322,6 +323,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
             return hopCount;
         }
 
+        @SuppressFBWarnings(value = "EQ_COMPARETO_USE_OBJECT_EQUALS", justification = "Silly check; it is perfectly reasonable to implement Comparable by writing a compareTo without an equals.")
         public int compareTo(DependencyNodeHopCountPair other) {
             return Integer.compare(hopCount, other.getHopCount());
         }
