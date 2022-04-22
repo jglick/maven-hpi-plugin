@@ -26,13 +26,16 @@ import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.artifact.versioning.OverConstrainedVersionException;
 import org.apache.maven.artifact.versioning.VersionRange;
+import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.shared.dependency.graph.DependencyCollectorBuilder;
 import org.apache.maven.shared.dependency.graph.DependencyCollectorBuilderException;
 import org.apache.maven.shared.dependency.graph.DependencyNode;
@@ -121,43 +124,22 @@ public class TestDependencyMojo extends AbstractHpiMojo {
                 DependencyNode node;
                 try {
                     MavenProject shadow = project.clone();
-                    // first pass: adjust direct dependencies in place
+                    // adjust dependencies in place
+                    // see Maven31DependencyCollectorBuilder
                     Set<String> updated = new HashSet<>();
-                    @SuppressWarnings("unchecked")
-                    Set<Artifact> dependencyArtifacts = shadow.getDependencyArtifacts(); // mutable; seems to be what DefaultDependencyTreeBuilder cares about
-                    for (Artifact art : dependencyArtifacts) {
-                        String key = art.getGroupId() + ":" + art.getArtifactId();
-                        String overrideVersion = overrides.get(key);
-                        if (overrideVersion != null) {
-                            getLog().debug("For dependency analysis, updating " + key + " from " + art.getVersion() + " to " + overrideVersion);
-                            art.setVersion(overrideVersion);
-                            updated.add(key);
-                        }
-                    }
-                    // second pass: add direct dependencies for transitive dependencies that need to be bumped
-                    @SuppressWarnings("unchecked")
-                    Set<Artifact> artifacts = shadow.getArtifacts();
-                    Set<String> transitiveUpdated = new HashSet<>();
-                    for (Artifact art : artifacts) {
-                        String key = art.getGroupId() + ":" + art.getArtifactId();
-                        if (updated.contains(key)) {
-                            continue; // already handled above
-                        }
-                        String overrideVersion = overrides.get(key);
-                        if (overrideVersion != null) {
-                            getLog().info("For dependency analysis, updating transitive " + key + " from " + art.getVersion() + " to " + overrideVersion);
-                            dependencyArtifacts.add(replace(art, overrideVersion));
-                            transitiveUpdated.add(key);
-                        }
+                    for (Dependency dependency : shadow.getDependencies()) {
+                        updateDependency(overrides, updated, dependency);
                     }
                     Set<String> unapplied = new HashSet<>(overrides.keySet());
                     unapplied.removeAll(updated);
-                    unapplied.removeAll(transitiveUpdated);
                     if (!unapplied.isEmpty()) {
                         throw new MojoFailureException("could not find dependencies " + unapplied);
                     }
-                    getLog().debug("adjusted dependencyArtifacts: " + dependencyArtifacts);
-                    node = dependencyCollectorBuilder.collectDependencyGraph(session.getProjectBuildingRequest(), /* all scopes */null);
+                    getLog().debug("adjusted dependencies: " + shadow.getDependencies());
+                    ProjectBuildingRequest buildingRequest =
+                            new DefaultProjectBuildingRequest(session.getProjectBuildingRequest());
+                    buildingRequest.setProject(shadow); // for org.apache.maven.shared.dependency.graph.internal.DefaultDependencyCollectorBuilder.collectDependencyGraph
+                    node = dependencyCollectorBuilder.collectDependencyGraph(buildingRequest, /* all scopes */null);
                 } catch (DependencyCollectorBuilderException x) {
                     throw new MojoExecutionException("could not analyze dependency tree for useUpperBounds: " + x, x);
                 }
@@ -198,6 +180,16 @@ public class TestDependencyMojo extends AbstractHpiMojo {
             // cf. http://maven.apache.org/surefire/maven-surefire-plugin/test-mojo.html
             properties.setProperty("maven.test.additionalClasspath", String.join(",", additionalClasspathElements));
             properties.setProperty("maven.test.dependency.excludes", String.join(",", classpathDependencyExcludes));
+        }
+    }
+
+    private void updateDependency(Map<String, String> overrides, Set<String> updated, Dependency dependency) {
+        String key = dependency.getGroupId() + ":" + dependency.getArtifactId();
+        String overrideVersion = overrides.get(key);
+        if (overrideVersion != null) {
+            getLog().debug("For dependency analysis, updating " + key + " from " + dependency.getVersion() + " to " + overrideVersion);
+            dependency.setVersion(overrideVersion);
+            updated.add(key);
         }
     }
 
