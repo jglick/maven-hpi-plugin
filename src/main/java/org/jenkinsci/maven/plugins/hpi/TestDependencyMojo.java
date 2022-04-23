@@ -104,6 +104,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
 
         if (!overrides.isEmpty()) {
             // Create a shadow project for dependency analysis.
+            // TODO under no circumstances should this code ever be executed when performing a release
             MavenProject shadow = project.clone();
 
             // First pass: apply the overrides specified by the user.
@@ -136,6 +137,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
                 overrides.putAll(upperBounds);
             }
 
+            // Re-resolve to ensure updated transitive dependencies get added to the override list
             Map<String, String> preResolve = new HashMap<>();
             for (Artifact artifact : shadow.getArtifacts()) {
                 preResolve.put(toKey(artifact), artifact.getVersion());
@@ -149,8 +151,8 @@ public class TestDependencyMojo extends AbstractHpiMojo {
             for (Map.Entry<String, String> entry : postResolve.entrySet()) {
                 String preVersion = preResolve.get(entry.getKey());
                 String postVersion = entry.getValue();
-                if (!preVersion.equals(postVersion)) {
-                    if (new ComparableVersion(preVersion).compareTo(new ComparableVersion(postVersion)) > 0) {
+                if (preVersion == null || !preVersion.equals(postVersion)) {
+                    if (preVersion != null && new ComparableVersion(preVersion).compareTo(new ComparableVersion(postVersion)) > 0) {
                         throw new AssertionError("this should never happen");
                     }
                     overrides.put(entry.getKey(), postVersion);
