@@ -9,33 +9,47 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
+import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.DefaultArtifact;
+import org.apache.maven.artifact.resolver.filter.ArtifactFilter;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
+import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.artifact.versioning.OverConstrainedVersionException;
 import org.apache.maven.artifact.versioning.VersionRange;
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.lifecycle.internal.LifecycleDependencyResolver;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.project.DefaultDependencyResolutionRequest;
 import org.apache.maven.project.DefaultProjectBuildingRequest;
+import org.apache.maven.project.DependencyResolutionException;
+import org.apache.maven.project.DependencyResolutionRequest;
+import org.apache.maven.project.DependencyResolutionResult;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuildingRequest;
+import org.apache.maven.project.ProjectDependenciesResolver;
 import org.apache.maven.shared.dependency.graph.DependencyCollectorBuilder;
 import org.apache.maven.shared.dependency.graph.DependencyCollectorBuilderException;
 import org.apache.maven.shared.dependency.graph.DependencyNode;
@@ -65,13 +79,15 @@ public class TestDependencyMojo extends AbstractHpiMojo {
     private List<String> overrideVersions;
 
     /**
-     * Whether to update all transitive dependencies to the upper bounds.
-     * Effectively causes same behavior as the {@code requireUpperBoundDeps} Enforcer rule would,
-     * if the specified dependencies were to be written to the POM.
-     * Intended for use in conjunction with {@link #overrideVersions}.
+     * Whether to update all transitive dependencies to the upper bounds. Effectively causes same
+     * behavior as the {@code requireUpperBoundDeps} Enforcer rule would, if the specified
+     * dependencies were to be written to the POM. Intended for use in conjunction with {@link
+     * #overrideVersions}.
      */
     @Parameter(property = "useUpperBounds")
     private boolean useUpperBounds;
+
+    @Inject private ProjectDependenciesResolver dependenciesResolver;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
@@ -85,6 +101,64 @@ public class TestDependencyMojo extends AbstractHpiMojo {
                 overrides.put(m.group(1), m.group(2));
             }
         }
+
+        if (!overrides.isEmpty()) {
+            // Create a shadow project for dependency analysis.
+            MavenProject shadow = project.clone();
+
+            // First pass: apply the overrides specified by the user.
+            pass(overrides, shadow, getLog());
+
+            if (useUpperBounds) {
+                // Do upper bounds analysis.
+                DependencyNode node;
+                try {
+                    ProjectBuildingRequest buildingRequest =
+                            new DefaultProjectBuildingRequest(session.getProjectBuildingRequest());
+                    buildingRequest.setProject(shadow);
+                    ArtifactFilter filter = null; // we need to evaluate all scopes;
+                    node = dependencyCollectorBuilder.collectDependencyGraph(buildingRequest, filter);
+                } catch (DependencyCollectorBuilderException x) {
+                    throw new MojoExecutionException("could not analyze dependency tree for useUpperBounds: " + x, x);
+                }
+                RequireUpperBoundDepsVisitor visitor = new RequireUpperBoundDepsVisitor();
+                node.accept(visitor);
+                Map<String, String> upperBounds = visitor.upperBounds();
+
+                for (String dep : upperBounds.keySet()) {
+                    if (overrides.containsKey(dep)) {
+                        throw new AssertionError("overrides should not contain dependency " + dep + " that was inferred by upper bounds");
+                    }
+                }
+
+                // Second pass: apply the results of the upper bounds analysis.
+                pass(upperBounds, shadow, getLog());
+                overrides.putAll(upperBounds);
+            }
+
+            Map<String, String> preResolve = new HashMap<>();
+            for (Artifact artifact : shadow.getArtifacts()) {
+                preResolve.put(toKey(artifact), artifact.getVersion());
+            }
+            shadow.setDependencyArtifacts(null); // force re-resolution
+            Set<Artifact> resolved = resolveDependencies(shadow);
+            Map<String, String> postResolve = new HashMap<>();
+            for (Artifact artifact : resolved) {
+                postResolve.put(toKey(artifact), artifact.getVersion());
+            }
+            for (Map.Entry<String, String> entry : postResolve.entrySet()) {
+                String preVersion = preResolve.get(entry.getKey());
+                String postVersion = entry.getValue();
+                if (!preVersion.equals(postVersion)) {
+                    if (new ComparableVersion(preVersion).compareTo(new ComparableVersion(postVersion)) > 0) {
+                        throw new AssertionError("this should never happen");
+                    }
+                    overrides.put(entry.getKey(), postVersion);
+                    getLog().debug("after re-resolving, adjusting " + entry.getKey() + " to " + postVersion);
+                }
+            }
+        }
+
         File testDir = new File(project.getBuild().getTestOutputDirectory(), "test-dependencies");
         try {
             Files.createDirectories(testDir.toPath());
@@ -119,38 +193,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
             throw new MojoExecutionException("Failed to copy dependency plugins",e);
         }
 
-        if (overrideVersions != null) {
-            if (useUpperBounds) {
-                DependencyNode node;
-                try {
-                    MavenProject shadow = project.clone();
-                    // adjust dependencies in place
-                    // see Maven31DependencyCollectorBuilder
-                    Set<String> updated = new HashSet<>();
-                    for (Dependency dependency : shadow.getDependencies()) {
-                        updateDependency(overrides, updated, dependency);
-                    }
-                    Set<String> unapplied = new HashSet<>(overrides.keySet());
-                    unapplied.removeAll(updated);
-                    if (!unapplied.isEmpty()) {
-                        throw new MojoFailureException("could not find dependencies " + unapplied);
-                    }
-                    getLog().debug("adjusted dependencies: " + shadow.getDependencies());
-                    ProjectBuildingRequest buildingRequest =
-                            new DefaultProjectBuildingRequest(session.getProjectBuildingRequest());
-                    buildingRequest.setProject(shadow); // for org.apache.maven.shared.dependency.graph.internal.DefaultDependencyCollectorBuilder.collectDependencyGraph
-                    node = dependencyCollectorBuilder.collectDependencyGraph(buildingRequest, /* all scopes */null);
-                } catch (DependencyCollectorBuilderException x) {
-                    throw new MojoExecutionException("could not analyze dependency tree for useUpperBounds: " + x, x);
-                }
-                RequireUpperBoundDepsVisitor visitor = new RequireUpperBoundDepsVisitor();
-                node.accept(visitor);
-                Map<String, String> upperBounds = visitor.upperBounds();
-                if (!upperBounds.isEmpty()) {
-                    getLog().debug("Applying upper bounds: " + upperBounds);
-                    overrides.putAll(upperBounds);
-                }
-            }
+        if (!overrides.isEmpty()) {
             List<String> additionalClasspathElements = new ArrayList<>();
             List<String> classpathDependencyExcludes = new ArrayList<>();
             for (Map.Entry<String, String> entry : overrides.entrySet()) {
@@ -183,13 +226,109 @@ public class TestDependencyMojo extends AbstractHpiMojo {
         }
     }
 
-    private void updateDependency(Map<String, String> overrides, Set<String> updated, Dependency dependency) {
-        String key = dependency.getGroupId() + ":" + dependency.getArtifactId();
+    private static void pass(Map<String, String> overrides, MavenProject project, Log log)
+            throws MojoFailureException {
+        Set<String> updatedDependencies = new HashSet<>();
+
+        // Update existing dependency entries in the model
+        for (Dependency dependency : project.getDependencies()) {
+            if (updateDependency(overrides, dependency, log)) {
+                updatedDependencies.add(toKey(dependency));
+            }
+        }
+
+        // Update existing dependency management entries in the model
+        if (project.getDependencyManagement() != null) {
+            for (Dependency dependency : project.getDependencyManagement().getDependencies()) {
+                if (updateDependency(overrides, dependency, log)) {
+                    updatedDependencies.add(toKey(dependency));
+                }
+            }
+        }
+
+        // If an override was requested for a transitive dependency that is not in the model, add a
+        // dependency management entry
+        Set<String> unappliedDependencies = new HashSet<>(overrides.keySet());
+        unappliedDependencies.removeAll(updatedDependencies);
+        for (Artifact artifact : project.getArtifacts()) {
+            String key = toKey(artifact);
+            if (unappliedDependencies.contains(key)) {
+                Dependency dependency = new Dependency();
+                dependency.setArtifactId(artifact.getArtifactId());
+                dependency.setGroupId(artifact.getGroupId());
+                dependency.setVersion(overrides.get(key));
+                dependency.setScope(artifact.getScope());
+                dependency.setType(artifact.getType());
+                dependency.setClassifier(artifact.getClassifier());
+                // TODO what if dependency management is null?
+                project.getDependencyManagement().addDependency(dependency);
+                updatedDependencies.add(key);
+            }
+        }
+        unappliedDependencies.removeAll(updatedDependencies);
+        if (!unappliedDependencies.isEmpty()) {
+            throw new MojoFailureException("could not find dependencies " + unappliedDependencies);
+        }
+        log.debug("adjusted dependencies: " + project.getDependencies());
+        if (project.getDependencyManagement() != null) {
+            log.debug("adjusted dependency management: " + project.getDependencyManagement().getDependencies());
+        }
+
+        // Now update the artifacts corresponding to the model changes
+        Set<String> updatedArtifacts = new HashSet<>();
+        for (Artifact artifact : project.getArtifacts()) {
+            String key = toKey(artifact);
+            if (updatedDependencies.contains(key)) {
+                String overrideVersion = overrides.get(key);
+                if (overrideVersion != null) {
+                    artifact.setVersion(overrideVersion);
+                    updatedArtifacts.add(key);
+                }
+            }
+        }
+        Set<String> unappliedArtifacts = new HashSet<>(overrides.keySet());
+        unappliedArtifacts.removeAll(updatedArtifacts);
+        if (!unappliedArtifacts.isEmpty()) {
+            throw new MojoFailureException("could not find artifacts " + unappliedArtifacts);
+        }
+    }
+
+    private static boolean updateDependency(
+            Map<String, String> overrides, Dependency dependency, Log log) {
+        String key = toKey(dependency);
         String overrideVersion = overrides.get(key);
         if (overrideVersion != null) {
-            getLog().debug("For dependency analysis, updating " + key + " from " + dependency.getVersion() + " to " + overrideVersion);
+            log.debug("For dependency analysis, updating " + key + " from " + dependency.getVersion() + " to " + overrideVersion);
             dependency.setVersion(overrideVersion);
-            updated.add(key);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Performs the equivalent of the "@requiresDependencyResolution" mojo attribute.
+     *
+     * @see LifecycleDependencyResolver#getDependencies(MavenProject, Collection, Collection,
+     *     MavenSession, boolean, Set)
+     */
+    private Set<Artifact> resolveDependencies(MavenProject project) throws MojoExecutionException {
+        try {
+            DependencyResolutionRequest request =
+                    new DefaultDependencyResolutionRequest(project, session.getRepositorySession());
+            DependencyResolutionResult result = dependenciesResolver.resolve(request);
+
+            Set<Artifact> artifacts = new LinkedHashSet<>();
+            if (result.getDependencyGraph() != null
+                    && !result.getDependencyGraph().getChildren().isEmpty()) {
+                RepositoryUtils.toArtifacts(
+                        artifacts,
+                        result.getDependencyGraph().getChildren(),
+                        Collections.singletonList(project.getArtifact().getId()),
+                        request.getResolutionFilter());
+            }
+            return artifacts;
+        } catch (DependencyResolutionException e) {
+            throw new MojoExecutionException("Unable to copy dependency plugin", e);
         }
     }
 
@@ -233,7 +372,6 @@ public class TestDependencyMojo extends AbstractHpiMojo {
         // added for TestDependencyMojo in place of getConflicts/containsConflicts
         public Map<String, String> upperBounds() {
             Map<String, String> r = new HashMap<>();
-            // TODO this does not suffice; does not find that workflow-api needs to go from 2.11 to 2.16, presumably because it was not a direct dependency to begin with
             for (List<DependencyNodeHopCountPair> pairs : keyToPairsMap.values()) {
                 DependencyNodeHopCountPair resolvedPair = pairs.get(0);
 
@@ -250,9 +388,11 @@ public class TestDependencyMojo extends AbstractHpiMojo {
                     ArtifactVersion version = pair.extractArtifactVersion(uniqueVersions, true);
                     if (resolvedVersion.compareTo(version) < 0) {
                         Artifact artifact = resolvedPair.node.getArtifact();
-                        String key = artifact.getGroupId() + ":" + artifact.getArtifactId();
-                        getLog().info("for " + key + ", upper bounds forces an upgrade from " + resolvedVersion + " to " + version);
-                        r.put(key, version.toString());
+                        if (!artifact.getScope().equals(Artifact.SCOPE_PROVIDED)) {
+                            String key = toKey(artifact);
+                            getLog().info("for " + key + ", upper bounds forces an upgrade from " + resolvedVersion + " to " + version);
+                            r.put(key, version.toString());
+                        }
                     }
                 }
             }
@@ -283,7 +423,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
 
         private String constructKey() {
             Artifact artifact = node.getArtifact();
-            return artifact.getGroupId() + ":" + artifact.getArtifactId();
+            return toKey(artifact);
         }
 
         public DependencyNode getNode() {
@@ -317,4 +457,11 @@ public class TestDependencyMojo extends AbstractHpiMojo {
         }
     }
 
+    private static String toKey(Artifact artifact) {
+        return artifact.getGroupId() + ":" + artifact.getArtifactId();
+    }
+
+    private static String toKey(Dependency dependency) {
+        return dependency.getGroupId() + ":" + dependency.getArtifactId();
+    }
 }
