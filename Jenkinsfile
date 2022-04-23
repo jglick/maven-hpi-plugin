@@ -21,7 +21,9 @@ def runTests(Map params = [:]) {
         }
         stage("Archive (${stageIdentifier})") {
           junit 'target/invoker-reports/TEST-*.xml'
-          infra.prepareToPublishIncrementals()
+          if (params['jdk'] == 8) {
+            infra.prepareToPublishIncrementals()
+          }
         }
       }
     }
