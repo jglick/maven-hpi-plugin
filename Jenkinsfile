@@ -15,12 +15,13 @@ def runTests(Map params = [:]) {
         stage("Build (${stageIdentifier})") {
           ansiColor('xterm') {
             withEnv(['MAVEN_OPTS=-Djansi.force=true']) {
-              sh 'mvn -B -Dstyle.color=always -ntp -Prun-its -Dmaven.test.failure.ignore clean install site'
+              sh 'mvn -B -Dstyle.color=always -ntp -Prun-its -Dset.changelist -Dmaven.test.failure.ignore clean install site'
             }
           }
         }
         stage("Archive (${stageIdentifier})") {
           junit 'target/invoker-reports/TEST-*.xml'
+          infra.prepareToPublishIncrementals()
         }
       }
     }
@@ -31,3 +32,4 @@ parallel(
     'linux-8': runTests(platform: 'linux', jdk: 8),
     'linux-11': runTests(platform: 'linux', jdk: 11)
 )
+infra.maybePublishIncrementals()
