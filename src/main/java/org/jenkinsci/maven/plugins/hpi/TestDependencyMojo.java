@@ -73,7 +73,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
 
     /**
      * List of dependency version overrides in the form {@code groupId:artifactId:version} to apply during testing.
-     * Must correspond to dependencies already present in the project model.
+     * Must correspond to dependencies already present in the project model or their transitive dependencies.
      */
     @Parameter(property = "overrideVersions")
     private List<String> overrideVersions;
