@@ -179,10 +179,6 @@ public class TestDependencyMojo extends AbstractHpiMojo {
                     String originalVersion = originalResolution.get(entry.getKey());
                     String newVersion = entry.getValue();
                     if (!newVersion.equals(originalVersion)) {
-                        // TODO is this check overkill?
-                        if (new ComparableVersion(originalVersion).compareTo(new ComparableVersion(newVersion)) > 0) {
-                            throw new AssertionError("should never happen");
-                        }
                         updates.put(entry.getKey(), newVersion);
                     }
                 } else {
