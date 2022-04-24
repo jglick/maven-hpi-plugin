@@ -104,10 +104,14 @@ public class TestDependencyMojo extends AbstractHpiMojo {
             }
         }
 
+        // The effective artifacts to be used when building the plugin index and test classpath.
         Set<MavenArtifact> effectiveArtifacts;
+
+        // Track changes to the classpath when the user has overridden dependency versions.
         Map<String, String> additions = new HashMap<>();
         Map<String, String> deletions = new HashMap<>();
         Map<String, String> updates = new HashMap<>();
+
         if (overrides.isEmpty()) {
             effectiveArtifacts = getProjectArtfacts();
         } else {
