@@ -30,13 +30,11 @@ import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.DefaultArtifact;
 import org.apache.maven.artifact.resolver.filter.ArtifactFilter;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.artifact.versioning.OverConstrainedVersionException;
-import org.apache.maven.artifact.versioning.VersionRange;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.lifecycle.internal.LifecycleDependencyResolver;
 import org.apache.maven.model.Dependency;
@@ -59,7 +57,6 @@ import org.apache.maven.shared.dependency.graph.DependencyCollectorBuilder;
 import org.apache.maven.shared.dependency.graph.DependencyCollectorBuilderException;
 import org.apache.maven.shared.dependency.graph.DependencyNode;
 import org.apache.maven.shared.dependency.graph.traversal.DependencyNodeVisitor;
-import org.apache.maven.shared.transfer.artifact.resolve.ArtifactResolverException;
 
 /**
  * Places test-dependency plugins into somewhere the test harness can pick up.
@@ -375,15 +372,6 @@ public class TestDependencyMojo extends AbstractHpiMojo {
             return artifacts;
         } catch (DependencyResolutionException e) {
             throw new MojoExecutionException("Unable to copy dependency plugin", e);
-        }
-    }
-
-    private Artifact replace(Artifact a, String version) throws MojoExecutionException {
-        Artifact a2 = new DefaultArtifact(a.getGroupId(), a.getArtifactId(), VersionRange.createFromVersion(version), a.getScope(), a.getType(), a.getClassifier(), a.getArtifactHandler(), a.isOptional());
-        try {
-            return artifactResolver.resolveArtifact(session.getProjectBuildingRequest(), a2).getArtifact();
-        } catch (ArtifactResolverException x) {
-            throw new MojoExecutionException("could not find " + a + " in version " + version + ": " + x, x);
         }
     }
 
