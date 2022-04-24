@@ -21,10 +21,12 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.ArtifactUtils;
 import org.apache.maven.artifact.DefaultArtifact;
 import org.apache.maven.artifact.resolver.filter.ArtifactFilter;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
@@ -103,9 +105,15 @@ public class TestDependencyMojo extends AbstractHpiMojo {
         }
 
         if (!overrides.isEmpty()) {
-            // Create a shadow project for dependency analysis.
             // TODO under no circumstances should this code ever be executed when performing a release
+
+            // Create a shadow project for dependency analysis.
             MavenProject shadow = project.clone();
+
+            // Do a deep copy of the artifacts, as we intend to modify these later.
+            shadow.setArtifacts(shadow.getArtifacts().stream()
+                    .map(ArtifactUtils::copyArtifact)
+                    .collect(Collectors.toSet()));
 
             // First pass: apply the overrides specified by the user.
             pass(overrides, shadow, getLog());
