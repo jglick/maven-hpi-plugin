@@ -107,12 +107,12 @@ public class TestDependencyMojo extends AbstractHpiMojo {
             }
         }
 
-        Set<MavenArtifact> artifactsToUse;
+        Set<MavenArtifact> effectiveArtifacts;
         Map<String, String> additions = new HashMap<>();
         Map<String, String> deletions = new HashMap<>();
         Map<String, String> updates = new HashMap<>();
         if (overrides.isEmpty()) {
-            artifactsToUse = getProjectArtfacts();
+            effectiveArtifacts = getProjectArtfacts();
         } else {
             // TODO under no circumstances should this code ever be executed when performing a release
 
@@ -168,7 +168,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
              * classpath.
              */
             Set<Artifact> resolved = resolveDependencies(shadow);
-            artifactsToUse = wrap(new Artifacts(resolved));
+            effectiveArtifacts = wrap(new Artifacts(resolved));
             Map<String, String> newResolution = new HashMap<>();
             for (Artifact artifact : resolved) {
                 newResolution.put(toKey(artifact), artifact.getVersion());
@@ -208,7 +208,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
         }
 
         try (FileOutputStream fos = new FileOutputStream(new File(testDir, "index")); Writer w = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
-            for (MavenArtifact a : artifactsToUse) {
+            for (MavenArtifact a : effectiveArtifacts) {
                 if (!a.isPluginBestEffort(getLog()))
                     continue;
 
@@ -240,7 +240,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
                 String version = entry.getValue();
                 // Cannot use MavenProject.getArtifactMap since we may have multiple dependencies of different classifiers.
                 boolean found = false;
-                for (MavenArtifact a : artifactsToUse) {
+                for (MavenArtifact a : effectiveArtifacts) {
                     if (!a.getGroupId().equals(groupId) || !a.getArtifactId().equals(artifactId)) {
                         continue;
                     }
@@ -295,13 +295,15 @@ public class TestDependencyMojo extends AbstractHpiMojo {
             }
         }
 
-        Set<String> additions = new HashSet<>();
-
-        /*
-         * If an override was requested for a transitive dependency that is not in the model, add a dependency management entry to the model.
-         */
+        // Track that we have applied some of the user's request by now.
         Set<String> unappliedDependencies = new HashSet<>(overrides.keySet());
         unappliedDependencies.removeAll(updates);
+
+        /*
+         * If an override was requested for a transitive dependency that is not in the model, add a dependency
+         * management entry to the model.
+         */
+        Set<String> additions = new HashSet<>();
         for (Artifact artifact : project.getArtifacts()) {
             String key = toKey(artifact);
             if (unappliedDependencies.contains(key)) {
@@ -321,6 +323,8 @@ public class TestDependencyMojo extends AbstractHpiMojo {
             }
         }
         unappliedDependencies.removeAll(additions);
+
+        // By now, we should have applied the entire request. If not, fail.
         if (!unappliedDependencies.isEmpty()) {
             throw new MojoFailureException("could not find dependencies " + unappliedDependencies);
         }
