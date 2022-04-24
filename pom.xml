@@ -80,16 +80,6 @@
       </dependency>
       <dependency>
         <groupId>org.eclipse.aether</groupId>
-        <artifactId>aether-util</artifactId>
-        <version>${aether.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.aether</groupId>
-        <artifactId>aether-api</artifactId>
-        <version>${aether.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.aether</groupId>
         <artifactId>aether-impl</artifactId>
         <version>${aether.version}</version>
       </dependency>
@@ -158,6 +148,11 @@
       <groupId>org.apache.maven.shared</groupId>
       <artifactId>maven-artifact-transfer</artifactId>
       <version>0.13.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven.shared</groupId>
+      <artifactId>maven-dependency-tree</artifactId>
+      <version>3.1.0</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
@@ -261,11 +256,6 @@
       <version>${maven-plugin-tools.version}</version>
       <!-- annotations are not needed for plugin execution, so exclude using provided scope -->
       <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.maven.shared</groupId>
-      <artifactId>maven-dependency-tree</artifactId>
-      <version>3.1.0</version>
     </dependency>
   </dependencies>
 
