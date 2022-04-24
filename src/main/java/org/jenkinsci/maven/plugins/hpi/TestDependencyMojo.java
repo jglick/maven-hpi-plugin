@@ -33,6 +33,7 @@ import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.DefaultArtifact;
 import org.apache.maven.artifact.resolver.filter.ArtifactFilter;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
+import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.artifact.versioning.OverConstrainedVersionException;
 import org.apache.maven.artifact.versioning.VersionRange;
@@ -434,8 +435,10 @@ public class TestDependencyMojo extends AbstractHpiMojo {
                     if (resolvedVersion.compareTo(version) < 0) {
                         Artifact artifact = resolvedPair.node.getArtifact();
                         String key = toKey(artifact);
-                        getLog().info("for " + key + ", upper bounds forces an upgrade from " + resolvedVersion + " to " + version);
-                        r.put(key, version.toString());
+                        if (!r.containsKey(key) || new ComparableVersion(version.toString()).compareTo(new ComparableVersion(r.get(key))) > 1) {
+                            getLog().info("for " + key + ", upper bounds forces an upgrade from " + resolvedVersion + " to " + version);
+                            r.put(key, version.toString());
+                        }
                     }
                 }
             }
