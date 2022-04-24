@@ -6,6 +6,7 @@ properties([
 def runTests(Map params = [:]) {
   return {
     def agentContainerLabel = params['jdk'] == 8 ? 'maven' : 'maven-' + params['jdk']
+    boolean publishing = params['jdk'] == 8
     node(agentContainerLabel) {
       timeout(time: 1, unit: 'HOURS') {
         def stageIdentifier = params['platform'] + '-' + params['jdk']
@@ -14,14 +15,16 @@ def runTests(Map params = [:]) {
         }
         stage("Build (${stageIdentifier})") {
           ansiColor('xterm') {
-            withEnv(['MAVEN_OPTS=-Djansi.force=true']) {
-              sh 'mvn -B -Dstyle.color=always -ntp -Prun-its -Dset.changelist -Dmaven.test.failure.ignore clean install site'
+            def args = ['-Dstyle.color=always', '-Prun-its', '-Dmaven.test.failure.ignore', 'clean', 'install', 'site']
+            if (publishing) {
+              args += '-Dset.changelist'
             }
+            infra.runMaven(args, params['jdk'])
           }
         }
         stage("Archive (${stageIdentifier})") {
           junit 'target/invoker-reports/TEST-*.xml'
-          if (params['jdk'] == 8) {
+          if (publishing) {
             infra.prepareToPublishIncrementals()
           }
         }
