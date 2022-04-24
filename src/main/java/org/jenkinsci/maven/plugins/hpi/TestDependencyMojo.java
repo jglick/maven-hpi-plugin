@@ -193,6 +193,7 @@ public class TestDependencyMojo extends AbstractHpiMojo {
             for (Map.Entry<String, String> entry : originalResolution.entrySet()) {
                 if (!newResolution.containsKey(entry.getKey())) {
                     // Present in old resolution but not new: deletion.
+                    deletions.put(entry.getKey(), entry.getValue());
                 }
             }
             getLog().debug("after re-resolving, additions: " + additions);
