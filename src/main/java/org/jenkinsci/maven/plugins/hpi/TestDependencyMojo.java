@@ -331,8 +331,9 @@ public class TestDependencyMojo extends AbstractHpiMojo {
         }
 
         /*
-         * With our changes to the model, the existing resolution is now invalid, so clear it lest anything accidentally use the invalid values.
-         * We will perform resolution again after all passes are complete.
+         * With our changes to the model, the existing resolution is now invalid, so clear it lest
+         * anything accidentally use the invalid values. We will perform resolution again after all
+         * passes are complete.
          */
         project.setDependencyArtifacts(null);
         project.setArtifacts(null);
