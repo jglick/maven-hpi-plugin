@@ -433,11 +433,9 @@ public class TestDependencyMojo extends AbstractHpiMojo {
                     ArtifactVersion version = pair.extractArtifactVersion(uniqueVersions, true);
                     if (resolvedVersion.compareTo(version) < 0) {
                         Artifact artifact = resolvedPair.node.getArtifact();
-                        if (!artifact.getScope().equals(Artifact.SCOPE_PROVIDED)) {
-                            String key = toKey(artifact);
-                            getLog().info("for " + key + ", upper bounds forces an upgrade from " + resolvedVersion + " to " + version);
-                            r.put(key, version.toString());
-                        }
+                        String key = toKey(artifact);
+                        getLog().info("for " + key + ", upper bounds forces an upgrade from " + resolvedVersion + " to " + version);
+                        r.put(key, version.toString());
                     }
                 }
             }
